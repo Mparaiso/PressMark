@@ -1,4 +1,4 @@
 development:
     dialect: sqlite3
     datasource: pressmark.db
-    dir: migrations/sqlite3
+    dir: migrations/development.sqlite3

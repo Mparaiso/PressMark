@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"time"
 )
+
 
 // UserRepository is a repository of users
 type UserRepository struct {
@@ -14,9 +14,9 @@ type UserRepository struct {
 
 // Find finds a user by id
 func (repository *UserRepository) Find(id int64) (*User, error) {
-	row := repository.DB.QueryRow("SELECT ID,NAME,EMAIL,CREATED,UPDATED FROM USERS WHERE ID=? LIMIT 1", id)
-	user := &User{}
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.Updated)
+	row := repository.DB.QueryRow("SELECT ID,NAME,EMAIL,CREATED,UPDATED,PASSWORD_DIGEST FROM USERS WHERE ID=? LIMIT 1", id)
+	user := &User{SecurePassword:&SecurePassword{}}
+	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.Updated,&user.PasswordDigest)
 	if err != nil {
 		return nil, err
 	}
@@ -66,9 +66,17 @@ func (repository *UserRepository) DeleteAll() error {
 
 // Save saves a model
 func (repository *UserRepository) Save(user *User) error {
+	if u, ok := interface{}(user).(BeforeSaveCallback); ok == true {
+		if err := u.BeforeSave(); err != nil {
+			return err
+		}
+	}
 	if user.ID == 0 {
-		user.Created = time.Now()
-		user.Updated = time.Now()
+		if u, ok := interface{}(user).(BeforeCreateCallback); ok == true {
+			if err := u.BeforeCreate(); err != nil {
+				return err
+			}
+		}
 		result, err := repository.DB.Exec("INSERT INTO USERS(NAME,EMAIL,CREATED,UPDATED) VALUES(?,?,?,?);", user.Name, user.Email, user.Created, user.Updated)
 		if err != nil {
 			return err
@@ -80,8 +88,11 @@ func (repository *UserRepository) Save(user *User) error {
 		user.ID = id
 		return nil
 	}
-	user.Updated = time.Now()
-
+	if u, ok := interface{}(user).(BeforeUpdateCallback); ok == true {
+		if err := u.BeforeUpdate(); err != nil {
+			return err
+		}
+	}
 	result, err := repository.DB.Exec("UPDATE USERS SET NAME=?,EMAIL=?,UPDATED=? WHERE ID=?;", user.Name, user.Email, user.Updated, user.ID)
 	if err != nil {
 		return err
