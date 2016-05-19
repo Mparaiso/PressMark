@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "github.com/amattn/go-sqlite3"
 	"log"
+	"reflect"
 )
 
 import (
@@ -29,6 +30,10 @@ type User struct {
 	Updated time.Time
 }
 
+func (user User) String() string {
+	return fmt.Sprintf("{ID:%d,Name:%s}", user.ID, user.Name)
+}
+
 // UserRepository is a repository of users
 type UserRepository struct {
 	DB *sql.DB
@@ -43,6 +48,35 @@ func (repository *UserRepository) Find(id int64) (*User, error) {
 		return nil, err
 	}
 	return user, err
+}
+
+// FindBy find users by fields
+func (repository *UserRepository) FindBy(fields map[string]interface{}) ([]*User, error) {
+	values := []interface{}{}
+	whereExpression := ""
+	for key, value := range fields {
+		values = append(values, value)
+		if whereExpression == "" {
+			whereExpression = fmt.Sprintf("%s = ?", key)
+		} else {
+			whereExpression = fmt.Sprintf("%s AND %s = ? ", whereExpression, key)
+		}
+	}
+	records, err := repository.DB.Query(fmt.Sprintf("SELECT ID,NAME,EMAIL,CREATED,UPDATED FROM USERS WHERE %s;", whereExpression), values...)
+	if err != nil {
+		return nil, err
+	}
+	users := []*User{}
+	defer records.Close()
+	for records.Next() {
+		if err := records.Err(); err != nil {
+			return nil, err
+		}
+		user := &User{}
+		records.Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.Updated)
+		users = append(users, user)
+	}
+	return users, nil
 }
 
 // DeleteAll deletes all models
@@ -85,6 +119,39 @@ func (repository *UserRepository) Save(user *User) error {
 	}
 	if rows == 0 {
 		return fmt.Errorf("User with ID %d does not exist.", user.ID)
+	}
+	return nil
+}
+
+// UpdateAttribute update selected attributes
+func (repository *UserRepository) UpdateAttribute(user *User, attributes map[string]interface{}) error {
+	values := []interface{}{}
+	setStatement := ""
+	userType := reflect.TypeOf(user)
+	for key, value := range attributes {
+		if _, ok := userType.Elem().FieldByName(key); !ok {
+			return fmt.Errorf("type %s doesn't have a field named %s ", userType.Name(), key)
+		}
+		values = append(values, value)
+		if setStatement == "" {
+			setStatement = fmt.Sprintf(" %s = ?", key)
+		} else {
+			setStatement = fmt.Sprintf(" %s, %s = ?", setStatement, key)
+		}
+	}
+	id := user.ID
+	result, err := repository.DB.Exec(fmt.Sprintf("UPDATE USERS SET %s WHERE ID = ?;", setStatement), append(values, id)...)
+	if err != nil {
+		return err
+	}
+	if _, err := result.RowsAffected(); err != nil {
+		return err
+	}
+	u, err := repository.Find(id)
+	*user = *u
+	//*user = *u
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -135,14 +202,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = userRepository.Find(10000)
-	if err!=nil{
-        log.Fatal(err)
-    }
+
 	log.Println("found user", user)
 	err = userRepository.Destroy(user)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("destroyed user", user)
+	users := []*User{
+		{Name: "John", Email: "john@acme.com"},
+		{Name: "Jane", Email: "jane@acme.com"},
+	}
+	for _, user := range users {
+		err = userRepository.Save(user)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	users, err = userRepository.FindBy(map[string]interface{}{"Name": "John"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%v", users)
+	err = userRepository.UpdateAttribute(users[0], map[string]interface{}{"Name": "Jack", "Email": "jack@acme.com"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("user updated by attribute: %s. \n", users[0])
+
 }
