@@ -3,16 +3,17 @@ package pressmark_test
 import (
 	"database/sql"
 	_ "github.com/amattn/go-sqlite3"
-	"github.com/interactiv/expect"
-	"github.com/mparaiso/PressMark"
+	"github.com/jmoiron/sqlx"
+	p "github.com/mparaiso/PressMark"
 	"github.com/rubenv/sql-migrate"
 	"testing"
 )
 
 type hash map[string]interface{}
 
-func Before() (*sql.DB, error) {
+func Before() (*sqlx.DB, error) {
 	db, err := sql.Open("sqlite3", ":memory:")
+
 	if err != nil {
 		return nil, err
 	}
@@ -23,29 +24,62 @@ func Before() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return db, nil
+
+	return sqlx.NewDb(db, "sqlite3"), nil
 }
 
-func TestSave(t *testing.T) {
-	e := expect.New(t)
-	db, err := Before()
-	e.Expect(err).ToBeNil()
-	userRepository := &pressmark.UserRepository{DB: db}
-	password := "the password"
-	user := &pressmark.User{
-		Name:           "John Doe",
-		Email:          "john.doe@acme.com",
-		SecurePassword: &pressmark.SecurePassword{Password: password},
-	}
-	err = userRepository.Save(user)
-	e.Expect(err).ToBeNil()
-	e.Expect(user.PasswordDigest).Not().ToBeNil()
-	t.Log(user,user.PasswordDigest)
-    
-	new_name := "John Walker Doe"
+// func TestSave(t *testing.T) {
+// 	e := expect.New(t)
+// 	db, err := Before()
+// 	e.Expect(err).ToBeNil()
+// 	userRepository := &p.UserRepository{DB: db}
+// 	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com", SecurePassword: &p.SecurePassword{}}
+// 	err = user.GenerateSecurePassword("password")
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	err = userRepository.Save(user)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	t.Log(user)
+// 	db.Close()
+// }
 
-	err = userRepository.UpdateAttribute(user, hash{"Name": new_name})
-	e.Expect(err).ToBeNil()
-	e.Expect(user.Name).ToBe(new_name)
-   // t.Log(user.PasswordDigest)
+func TestAll(t *testing.T) {
+	db, _ := Before()
+	defer db.Close()
+	userRepository := &p.UserRepository{DB: db, TableName: "USERS",IDField:"ID"}
+	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com"}
+	err := userRepository.Save(user)
+	users := []*p.User{}
+	err = userRepository.All(&users)
+	t.Log("users length : ",len(users))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFind(t *testing.T) {
+	db, _ := Before()
+	defer db.Close()
+	userRepository := &p.UserRepository{DB: db, IDField: "ID", TableName: "USERS"}
+	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com"}
+	_ = user.GenerateSecurePassword("password")
+	err := userRepository.Save(user)
+	var id int64 = 1 // user.ID
+	t.Log("ID",id)
+	fetchedUser := &p.User{}
+	err = userRepository.Find(id, fetchedUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(fetchedUser)
+	t.Log(fetchedUser.PasswordDigest)
+	// verify that the password is the right one
+	err = fetchedUser.Authenticate("password")
+	if err != nil {
+		t.Fatal("Failed to authenticate.", err)
+	}
+
 }
