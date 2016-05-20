@@ -1,5 +1,5 @@
 package main
-
+/*
 import (
 	"database/sql"
 	_ "github.com/amattn/go-sqlite3"
@@ -81,3 +81,4 @@ func main() {
 	log.Printf("user updated by attribute: %s. \n", users[0])
 
 }
+*/
