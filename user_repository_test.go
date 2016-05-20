@@ -28,35 +28,20 @@ func Before() (*sqlx.DB, error) {
 	return sqlx.NewDb(db, "sqlite3"), nil
 }
 
-// func TestSave(t *testing.T) {
-// 	e := expect.New(t)
-// 	db, err := Before()
-// 	e.Expect(err).ToBeNil()
-// 	userRepository := &p.UserRepository{DB: db}
-// 	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com", SecurePassword: &p.SecurePassword{}}
-// 	err = user.GenerateSecurePassword("password")
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	err = userRepository.Save(user)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	t.Log(user)
-// 	db.Close()
-// }
-
 func TestAll(t *testing.T) {
 	db, _ := Before()
 	defer db.Close()
-	userRepository := &p.UserRepository{DB: db, TableName: "USERS",IDField:"ID"}
+	userRepository := &p.UserRepository{DB: db, TableName: "USERS", IDField: "ID"}
 	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com"}
 	err := userRepository.Save(user)
 	users := []*p.User{}
 	err = userRepository.All(&users)
-	t.Log("users length : ",len(users))
+	t.Log("users length : ", len(users))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("len(users) should be 1, got %d", len(users))
 	}
 }
 
@@ -67,19 +52,14 @@ func TestFind(t *testing.T) {
 	user := &p.User{Name: "John Doe", Email: "john.doe@acme.com"}
 	_ = user.GenerateSecurePassword("password")
 	err := userRepository.Save(user)
-	var id int64 = 1 // user.ID
-	t.Log("ID",id)
 	fetchedUser := &p.User{}
-	err = userRepository.Find(id, fetchedUser)
+	err = userRepository.Find(user.ID, fetchedUser)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(fetchedUser)
-	t.Log(fetchedUser.PasswordDigest)
 	// verify that the password is the right one
 	err = fetchedUser.Authenticate("password")
 	if err != nil {
 		t.Fatal("Failed to authenticate.", err)
 	}
-
 }

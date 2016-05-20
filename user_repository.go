@@ -76,7 +76,7 @@ func (repository *UserRepository) Save(model *User) error {
 		for key, value := range fieldMap {
 			if strings.ToLower(key) != strings.ToLower(repository.IDField) {
 				paths = append(paths, key)
-				values = append(values, value)
+				values = append(values, value.Interface())
 			}
 		}
 		//fmt.Print(paths, values)
@@ -93,8 +93,7 @@ func (repository *UserRepository) Save(model *User) error {
 		if err != nil {
 			return err
 		}
-		model.ID = id
-		return nil
+		return repository.Find(id,model)
 	}
 	if u, ok := interface{}(model).(BeforeUpdateCallback); ok == true {
 		if err := u.BeforeUpdate(); err != nil {
