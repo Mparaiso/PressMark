@@ -1,9 +1,13 @@
 package pressmark
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"time"
+
+	"github.com/mparaiso/PressMark/datamapper"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var _ datamapper.DataMapperMetadataProvider = &User{}
 
 // User is a user
 type User struct {
@@ -12,7 +16,22 @@ type User struct {
 	Email          string
 	Created        time.Time
 	Updated        time.Time
-	PasswordDigest string `db:"password_digest"`	
+	PasswordDigest string
+}
+
+func (User) DataMapperMetaData() datamapper.DataMapperMetadata {
+	return datamapper.DataMapperMetadata{
+		Entity: "User",
+		Table:  datamapper.Table{Name: "USERS"},
+		Columns: []datamapper.Column{
+			{Id: true, StructField: "ID"},
+			{StructField: "Email"},
+			{StructField: "Name"},
+			{StructField: "Created"},
+			{StructField: "Updated"},
+			{StructField: "PasswordDigest", Name: "password_digest"},
+		},
+	}
 }
 
 func (user *User) BeforeCreate() (err error) {
